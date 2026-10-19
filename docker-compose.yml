@@ -1,0 +1,50 @@
+services:
+  usuarios-db:
+    image: postgres:16
+    container_name: usuarios-db
+    environment:
+      POSTGRES_USER: usuarios
+      POSTGRES_PASSWORD: usuarios
+      POSTGRES_DB: usuarios
+    ports:
+      - "5433:5432" # Exposto na porta 5433 do host para desenvolvimento local
+    volumes:
+      - usuarios-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U usuarios -d usuarios"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: usuarios-rabbitmq
+    ports:
+      - "5672:5672"   # Protocolo AMQP
+      - "15672:15672" # Interface administrativa web
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  usuarios-service:
+    build: .
+    container_name: usuarios-service
+    ports:
+      - "3001:3001"
+    environment:
+      PORT: 3001
+      DATABASE_URL: postgresql://usuarios:usuarios@usuarios-db:5432/usuarios
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
+    depends_on:
+      usuarios-db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  usuarios-db-data:
